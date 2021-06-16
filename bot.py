@@ -46,26 +46,27 @@ def read_email_from_gmail():
         messages = messages[0].split(b' ')
         down_text = False
         up_text = False
-        if messages[0].split(b' ') == [b'1']:   # if there is mail in the mailbox...
-            for mail in messages:
-                _, msg = imap.fetch(mail, "(RFC822)")
-                # you can delete the for loop for performance if you have a long list of emails
-                # because it is only for printing the SUBJECT of target email to delete
-                for response in msg:
-                    if isinstance(response, tuple):
-                        msg = email.message_from_bytes(response[1])
-                        # decode the email subject
-                        subject = decode_header(msg["Subject"])[0][0]
-                        if isinstance(subject, bytes):
-                            # if it's a bytes type, decode to str
-                            subject = subject.decode()
-                        if 'macd_down' in subject:
-                            down_text = subject
-                            imap.store(mail, "+FLAGS", "\\Deleted")
-                            # mark the mail as deleted
-                        if 'macd_uptrend' in subject:
-                            up_text = subject
-                            imap.store(mail, "+FLAGS", "\\Deleted")
+        if len(messages) > 0:  #  if there is mail in the mailbox...
+            if messages[0] != b'':
+                for mail in messages:
+                    _, msg = imap.fetch(mail, "(RFC822)")
+                    # you can delete the for loop for performance if you have a long list of emails
+                    # because it is only for printing the SUBJECT of target email to delete
+                    for response in msg:
+                        if isinstance(response, tuple):
+                            msg = email.message_from_bytes(response[1])
+                            # decode the email subject
+                            subject = decode_header(msg["Subject"])[0][0]
+                            if isinstance(subject, bytes):
+                                # if it's a bytes type, decode to str
+                                subject = subject.decode()
+                            if 'macd_down' in msg._payload.split('">Alert: New symbols:')[1]:
+                                down_text = msg._payload.split('">Alert: New symbols:')[1].split('</p></td>\r\n')[0]
+                                imap.store(mail, "+FLAGS", "\\Deleted")
+                                # mark the mail as deleted
+                            if 'macd_up' in msg._payload.split('">Alert: New symbols:')[1]:
+                                up_text = msg._payload.split('">Alert: New symbols:')[1].split('</p></td>\r\n')[0]
+                                imap.store(mail, "+FLAGS", "\\Deleted")
             imap.expunge()
         imap.close()
         imap.logout()
@@ -83,12 +84,15 @@ def read_email_from_gmail():
 @limits(calls=120, period=60)
 def td_client_request(c, ticker=False):
     data = c.get_price_history(ticker,
-                               period_type=Client.PriceHistory.PeriodType.DAY,
-                               period=Client.PriceHistory.Period.TEN_DAYS,
                                frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
                                frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
+                               start_datetime=datetime.datetime.now() - datetime.timedelta(360),
                                end_datetime=datetime.datetime.now())
-    return data.json()
+    try:
+        return data.json()
+    except Exception as e:
+        print(e)
+
 
 
 class threeema(bt.Strategy):
@@ -131,7 +135,7 @@ class threeema(bt.Strategy):
 
 
 def parse_alert(text):
-    symbols = ''.join(text.split('symbols: ')[1].split(' were added')[0].split('\r\n')).split(', ')
+    symbols = ''.join(text.split('=\r\n')).split('were added')[0].strip(' ').split(', ')
     return symbols
 
 
@@ -213,4 +217,3 @@ while True:
         continue
 
 
-print('now what')
