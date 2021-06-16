@@ -8,7 +8,7 @@ import pickle as pkl
 from ratelimit import limits, sleep_and_retry
 import sys
 import backtrader as bt
-
+from bs4 import BeautifulSoup
 import os
 from glob import glob
 import pandas as pd
@@ -56,17 +56,15 @@ def read_email_from_gmail():
                         if isinstance(response, tuple):
                             msg = email.message_from_bytes(response[1])
                             # decode the email subject
-                            subject = decode_header(msg["Subject"])[0][0]
-                            if isinstance(subject, bytes):
-                                # if it's a bytes type, decode to str
-                                subject = subject.decode()
-                            if 'macd_down' in msg._payload.split('">Alert: New symbols:')[1]:
-                                down_text = msg._payload.split('">Alert: New symbols:')[1].split('</p></td>\r\n')[0]
+                            soup = BeautifulSoup(msg._payload, 'html.parser')
+                            if 'macd_down' in soup.get_text().split('\nAlert')[1]:
+                                down_text = soup.get_text().split('\nAlert')[1]
                                 imap.store(mail, "+FLAGS", "\\Deleted")
                                 # mark the mail as deleted
-                            if 'macd_up' in msg._payload.split('">Alert: New symbols:')[1]:
-                                up_text = msg._payload.split('">Alert: New symbols:')[1].split('</p></td>\r\n')[0]
+                            if 'macd_up' in soup.get_text().split('\nAlert')[1]:
+                                up_text = soup.get_text().split('\nAlert')[1]
                                 imap.store(mail, "+FLAGS", "\\Deleted")
+                        imap.store(mail, "+FLAGS", "\\Deleted")
             imap.expunge()
         imap.close()
         imap.logout()
@@ -86,23 +84,24 @@ def td_client_request(c, ticker=False):
     data = c.get_price_history(ticker,
                                frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
                                frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
-                               start_datetime=datetime.datetime.now() - datetime.timedelta(360),
+                               start_datetime=datetime.datetime.now() - datetime.timedelta(60),
                                end_datetime=datetime.datetime.now())
     try:
         return data.json()
     except Exception as e:
-        print(e)
+        return False
 
 
 
-class threeema(bt.Strategy):
+class hull(bt.Strategy):
+    params = dict(
+        stop_loss=0.02,  # price is 2% less than the entry point
+        trail=False,
+    )
 
     def __init__(self):
-
-        self.sma = bt.indicators.SMA(self.data, period=5)
-        self.mma = bt.indicators.EMA(self.data, period=8)
-        self.lma = bt.indicators.EMA(self.data, period=13)
-
+        self.hull = bt.indicators.HullMovingAverage(self.data)
+        self.uptrend = False
 
 
     def notify_order(self, order):
@@ -110,48 +109,105 @@ class threeema(bt.Strategy):
             return  # discard any other notification
 
         if not self.position:  # we left the market
-            #print('SELL@price: {:.2f}'.format(order.executed.price))
+            print('SELL@price: {:.2f}'.format(order.executed.price))
             return
 
-        # We have entered the market
-        #print('BUY @price: {:.2f}'.format(order.executed.price))
-        self.buyprice = order.executed.price
-        self.lipsunder = False
+        print('BUY @price: {:.2f}'.format(order.executed.price))
+
 
     def next(self):
+        if self.hull.lines.hma[0] > self.hull.lines.hma[-1]:
+            self.uptrend = True
+        else:
+            self.uptrend = False
         #self.closeness = self.sma[0] * .001
         if not self.position:
-            if self.sma < self.mma and self.sma < self.lma:
-                self.lipsunder = True
-            else:
-                self.lipsunder = False
-            if self.lipsunder and self.data.close > self.mma:
+            if self.uptrend:
                 self.buy(size=1)
-                self.lipsunder = False
-
+                if not self.p.trail:
+                    stop_price = self.data.close[0] * (1.0 - self.p.stop_loss)
+                    self.sell(exectype=bt.Order.Stop, price=stop_price)
+                else:
+                    self.sell(exectype=bt.Order.StopTrail,
+                              trailamount=self.p.trail)
         else:
-            if self.data.close < self.sma:
+            if not self.uptrend:
+                self.close()
+
+
+class macd(bt.Strategy):
+    params = dict(
+        stop_loss=0.02,  # price is 2% less than the entry point
+        trail=False,
+    )
+
+    def __init__(self):
+        self.lma = bt.indicators.MovingAverageSimple(self.data, period=200)
+        self.macd = bt.indicators.MACDHisto(self.data)
+        self.uptrend = False
+
+
+    def notify_order(self, order):
+        if not order.status == order.Completed:
+            return  # discard any other notification
+
+        if not self.position:  # we left the market
+            print('SELL@price: {:.2f}'.format(order.executed.price))
+            return
+
+        print('BUY @price: {:.2f}'.format(order.executed.price))
+
+
+    def next(self):
+        if (self.data.tick_close * .1) < (self.data.tick_close - self.data.close[200]):
+            self.uptrend = True
+        else:
+            self.uptrend = False
+        #self.closeness = self.sma[0] * .001
+        if not self.position:
+            if self.uptrend:
+                if self.macd.lines.histo > 0:
+                    self.buy(size=1)
+                    if not self.p.trail:
+                        stop_price = self.data.close[0] * (1.0 - self.p.stop_loss)
+                        self.sell(exectype=bt.Order.Stop, price=stop_price)
+                    else:
+                        self.sell(exectype=bt.Order.StopTrail,
+                                  trailamount=self.p.trail)
+        else:
+            if not self.uptrend or self.macd.lines.histo < 0:
                 self.close()
 
 
 def parse_alert(text):
-    symbols = ''.join(text.split('=\r\n')).split('were added')[0].strip(' ').split(', ')
+    try:
+        symbols = ''.join(text.split('\r\n: ')[1].split(' were added')[0].split('=\r\n')).split(', ')
+    except Exception:
+        try:
+            symbols = [text.split('=\r\n ')[1].split(' was added')[0]]
+        except Exception as e:
+            print(e)
     return symbols
 
 
 def backtest(ticker, df):
-    startcash = 200000
-    cerebro = bt.Cerebro()
-    cerebro.addstrategy(threeema)
-    data = bt.feeds.PandasData(dataname=df)
-    cerebro.adddata(data, name="Real")
-    cerebro.broker.setcash(startcash)
-    cerebro.run()
-    # Get final portfolio Value
-    portvalue = cerebro.broker.getvalue()
-    pnl = portvalue - startcash
-    print('Final Portfolio Value: ${}'.format(round(portvalue, 2)))
-    print('P/L: ${}'.format(round(pnl, 2)))
+    for s in [macd]:
+        startcash = 200000
+        cerebro = bt.Cerebro()
+        cerebro.addstrategy(s)
+        data = bt.feeds.PandasData(dataname=df)
+        cerebro.adddata(data, name="Real")
+        cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe_ratio')
+        cerebro.broker.setcash(startcash)
+        cerebro.run()
+        # Get final portfolio Value
+        portvalue = cerebro.broker.getvalue()
+        pnl = portvalue - startcash
+        print('Final Portfolio Value: ${}'.format(round(portvalue, 2)))
+        print('P/L: ${}'.format(round(pnl, 2)))
+        cerebro.plot(style='candlestick')
+        print('pause')
+
 
 
 def backtest_symbols(c, symbols):
@@ -159,24 +215,24 @@ def backtest_symbols(c, symbols):
     for ticker in symbols:
         # for each ticker, get the price history to do check if it meets our criteria
         data = td_client_request(c, ticker)
+        if data:
+            try:
+                if not data.get('error'):
+                    ticker_df[ticker] = pd.DataFrame(data['candles'])
+                    first_column = ticker_df[ticker].pop('datetime')
+                    ticker_df[ticker].insert(0, 'date', first_column)
+                    ticker_df[ticker]['date'] = pd.to_datetime(ticker_df[ticker]['date'], format="%Y/%m/%d %H:%M:%S")
+                    ticker_df[ticker].set_index('date', inplace=True)
+                    # apply strategy to each ticker to find the good ones.
+                    if len(data['candles']) > 200:
+                        # now backtest this symbol with strategy and see if its profitable
+                        print('processing {}'.format(ticker))
+                        backtest(ticker, ticker_df[ticker])
 
-        try:
-            if not data.get('error'):
-                ticker_df[ticker] = pd.DataFrame(data['candles'])
-                first_column = ticker_df[ticker].pop('datetime')
-                ticker_df[ticker].insert(0, 'date', first_column)
-                ticker_df[ticker]['date'] = pd.to_datetime(ticker_df[ticker]['date'], format="%Y/%m/%d %H:%M:%S")
-                ticker_df[ticker].set_index('date', inplace=True)
-                # apply strategy to each ticker to find the good ones.
-                if len(data['candles']) > 50:
-                    # now backtest this symbol with strategy and see if its profitable
-                    print('processing {}'.format(ticker))
-                    backtest(ticker, ticker_df[ticker])
+                        #sys.stdout.write(".")
 
-                    #sys.stdout.write(".")
-
-        except Exception as e:
-            print(e)
+            except Exception as e:
+                print(e)
 
 
 
@@ -195,7 +251,13 @@ while True:
         with webdriver.Firefox() as driver:
             c = auth.client_from_login_flow(
                 driver, api_key, redirect_uri, token_path)
-    account_info = c.get_accounts().json()[0]
+    while True:
+        try:
+            account_info = c.get_accounts().json()[0]
+            break
+        except KeyError as e:
+            time.sleep(1)
+            pass
     cash_balance = account_info['securitiesAccount']['currentBalances']['cashBalance']
     cash_available_for_trade = account_info['securitiesAccount']['currentBalances']['buyingPowerNonMarginableTrade']
     up_text, down_text = read_email_from_gmail()
