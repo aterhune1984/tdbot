@@ -178,7 +178,7 @@ runningpl = 0
 
 
 
-token_path = './/token.pickle'
+token_path = './token.pickle'
 api_key = '{}@AMER.OAUTHAP'.format(ameritrade)
 redirect_uri = 'http://localhost:8000'
 restricted_symbols = ['RXT']
