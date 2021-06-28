@@ -190,7 +190,7 @@ while True:
     except FileNotFoundError:
         from selenium import webdriver
 
-        with webdriver.PhantomJS() as driver:
+        with webdriver.Firefox() as driver:
             c = auth.client_from_login_flow(
                 driver, api_key, redirect_uri, token_path)
     while True:
