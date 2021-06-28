@@ -1,36 +1,25 @@
 #!/usr/bin/env python
 
 from keys import ameritrade, gmailpass
-import requests
-import time
-import json
-import pickle as pkl
+
 from ratelimit import limits, sleep_and_retry
 import sys
-import backtrader as bt
 from bs4 import BeautifulSoup
-import os
-from glob import glob
-import pandas as pd
+
 from apscheduler.schedulers.background import BackgroundScheduler
-import yfinance as yf
-import pandas_ta as ta
-import numpy as np
-import talib
+
 import datetime
 from tda import auth
 from tda.client import Client
 from tda.orders.generic import OrderBuilder
 from tda.orders.equities import equity_sell_limit, equity_buy_market,equity_buy_limit, equity_sell_market
 from tda.orders.common import Duration, Session,OrderType,StopPriceLinkType,StopPriceLinkBasis, first_triggers_second
-import smtplib
 import time
 import imaplib
 import email
 import traceback
 import random
 import math
-from email.header import decode_header
 
 url = "https://api.tdameritrade.com/"
 scheduler = BackgroundScheduler()
@@ -172,137 +161,6 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
     return False
 
 
-class hull(bt.Strategy):
-
-    params = dict(
-        period1=8,
-        period2=21,
-
-        devfactor=2,
-        size=20,
-        stoptype=bt.Order.StopTrail,
-    )
-
-    def __init__(self):
-        self.hull1 = bt.indicators.HullMovingAverage(self.data, period=self.p.period1)
-        self.hull2 = bt.indicators.HullMovingAverage(self.data, period=self.p.period2)
-        self.hx = bt.indicators.CrossOver(self.hull1,self.hull2)
-        self.atr = bt.indicators.ATR(self.data)
-
-    def next(self):
-        if not self.position and self.hx > 0:
-            self.order = self.buy(size=self.p.size)
-        else:
-            if self.hx < 0:
-                self.order = self.close()
-
-    def notify_trade(self, trade):
-        if trade.isclosed:
-            dt = self.data.datetime.date()
-
-
-class bollinger(bt.Strategy):
-
-    params = dict(
-        period=20,
-        devfactor=2,
-        size=20,
-        stoptype=bt.Order.StopTrail,
-    )
-
-    def __init__(self):
-        self.boll = bt.indicators.BollingerBands(period=self.p.period, devfactor=self.p.devfactor)
-        self.sx = bt.indicators.CrossDown(self.data.close, self.boll.lines.mid)
-        self.lx = bt.indicators.CrossUp(self.data.close, self.boll.lines.bot)
-        self.atr = bt.indicators.ATR(self.data)
-        self.ema = bt.indicators.EMA(self.data, period=100)
-        self.lma = bt.indicators.EMA(self.data, period=200)
-        self.reversal = bt.indicators.Th
-
-        self.uptrend = False
-
-    def next(self):
-
-        if self.lma[-1] < self.lma[0]:
-            self.uptrend = True
-        else:
-            self.uptrend = False
-        if not self.position:
-            if self.lx > 0 and self.uptrend:
-                self.order = self.buy(size=self.p.size)
-                self.order = self.sell(size=self.p.size, exectype=bt.Order.StopTrail, trailamount=self.atr * 2)
-
-        #else:
-        #    if self.sx > 0:
-        #        self.order = self.sell(size=self.p.size)
-
-
-    def notify_trade(self, trade):
-        if trade.isclosed:
-            dt = self.data.datetime.date()
-
-
-class macd(bt.Strategy):
-    params=(
-        ('macd1', 12),
-        ('macd2', 26),
-        ('macdsig',9),
-        ('size', 20),
-        ('sma1', 9),
-        ('sma2', 21),
-        ('sma3', 50),
-        ('sma4', 100),
-        ('sma5', 200))
-
-    def notify_order(self, order):
-        if order.status == order.Completed:
-            pass
-        if not order.alive():
-            self.order = None
-
-    def __init__(self):
-        self.macd = bt.indicators.MACD(self.data,
-                                       period_me1=self.p.macd1,
-                                       period_me2=self.p.macd2,
-                                       period_signal=self.p.macdsig)
-        self.rsi = bt.indicators.RSI(self.data)
-
-        self.mcross = bt.indicators.CrossOver(self.macd.macd, self.macd.signal)
-        self.closedbelow = False
-        self.closedabove = False
-        self.stoploss = 0
-
-        #self.sma = bt.indicators.EMA(self.data, period=self.p.smaperiod)
-
-        #self.smadir = self.sma - self.sma(-self.p.dirperiod)
-
-    def start(self):
-        self.order = None
-
-    def next(self):
-        if self.order:
-            return
-        pass
-        if self.macd.lines.signal < 0:
-            self.macdbelow = True
-        else:
-            self.macdbelow = False
-        for i in range(-4, 1):
-            if self.rsi[i] < 30:
-                self.closedbelow = True
-            if self.rsi[i] > 70:
-                self.closedabove = True
-        if not self.position:
-            if self.macdbelow and self.closedbelow and self.mcross > 0:
-                self.order = self.buy(size=self.p.size)
-                self.order = self.sell(size=self.p.size, exectype=bt.Order.Stop, price=self.data.tick_close - (self.data. tick_close*.02))
-        elif not self.macdbelow and self.closedabove and self.mcross < 0:
-            self.order = self.sell(size=self.p.size)
-
-        if self.closedbelow:
-            self.closedbelow = False
-        if self.closedabove:
-            self.closedabove = False
 
 def parse_alert(text):
     try:
@@ -318,55 +176,6 @@ def parse_alert(text):
 global runningpl
 runningpl = 0
 
-
-def backtest(ticker, df, backtest_dict):
-    global runningpl
-    for s in [macd]:
-        startcash = 200000
-        cerebro = bt.Cerebro()
-        cerebro.addstrategy(s)
-        data = bt.feeds.PandasData(dataname=df, compression=15, timeframe=bt.TimeFrame.Minutes)
-        cerebro.adddata(data, name="Real")
-        cerebro.addanalyzer(bt.analyzers.SQN, _name="sqn")
-        cerebro.broker.setcash(startcash)
-        run = cerebro.run()
-        # Get final portfolio Value
-        sqn = run[0].analyzers.sqn.get_analysis()
-        portvalue = cerebro.broker.getvalue()
-        pnl = portvalue - startcash
-        #backtest_dict[ticker] = {'sqn': sqn['sqn'], 'stop_loss': run[0].boll.lines.bot[0]}
-        runningpl += round(pnl, 2)
-        cerebro.plot(style='candlestick')
-        print(sqn['sqn'])
-        print(runningpl)
-    return backtest_dict
-
-
-def backtest_symbols(c, symbols, backtest_dict):
-    ticker_df = {}
-    for ticker in symbols:
-        backtest_dict[ticker] = {}
-        # for each ticker, get the price history to do check if it meets our criteria
-        data = td_client_request('get_price_history', c, ticker)
-        if data:
-            try:
-                if not data.get('error'):
-                    ticker_df[ticker] = pd.DataFrame(data['candles'])
-                    first_column = ticker_df[ticker].pop('datetime')
-                    ticker_df[ticker].insert(0, 'datetime', first_column)
-                    ticker_df[ticker]['datetime'] = pd.to_datetime(ticker_df[ticker]['datetime'], unit='ms')
-                    ticker_df[ticker].set_index('datetime', inplace=True)
-                    # apply strategy to each ticker to find the good ones.
-                    if len(data['candles']) > 200:
-                        # now backtest this symbol with strategy and see if its profitable
-                        sys.stdout.write('processing {}...'.format(ticker))
-                        backtest_dict = backtest(ticker, ticker_df[ticker], backtest_dict)
-                        sys.stdout.write('{}\r\n'.format(backtest_dict[ticker]['sqn']))
-                        #sys.stdout.write(".")
-
-            except Exception as e:
-                print(e)
-    return backtest_dict
 
 
 token_path = './/token.pickle'
@@ -416,18 +225,7 @@ while True:
             else:
                 reduced_symbols = symbols
             print('received buy signal, pulling {}'.format(reduced_symbols))
-            #backtest_dict = backtest_symbols(c, reduced_symbols, backtest_dict)
-            #try:
-            #    for k, v in backtest_dict.items():
-            #        if not v:
-            #            backtest_dict[k] = {'sqn': 0}
-            #    #good_backtested_symbols = [x[0] for x in backtest_dict.items() if x[1].get('sqn') > 2]
-            #    good_backtested_symbols = []
-            #    for k, v in backtest_dict.items():
-            #        if v['sqn'] > 1:
-            #            good_backtested_symbols.append(k)
-            #except Exception as e:
-            #    print('fail')
+
             if reduced_symbols:
                 prices = td_client_request('get_quotes', c, reduced_symbols)
                 # get list of symbols that I can afford
