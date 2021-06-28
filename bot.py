@@ -395,9 +395,17 @@ while True:
     cash_balance = account_info['securitiesAccount']['currentBalances']['liquidationValue']
     cash_available_for_trade = account_info['securitiesAccount']['currentBalances']['cashAvailableForTrading']
     up_text, down_text = read_email_from_gmail()
-    market_hours = c.get_hours_for_single_market(c.Markets.EQUITY, datetime.datetime.now())
-    marketstart = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['start']
-    marketend = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['end']
+    while True:
+        try:
+
+            market_hours = c.get_hours_for_single_market(c.Markets.EQUITY, datetime.datetime.now())
+            marketstart = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['start']
+            marketend = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['end']
+            break
+        except:
+            sys.stdout.write('x')
+            time.sleep(1)
+            pass
     # test if we are in regular market hours
     if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= datetime.datetime.fromisoformat(marketstart) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
         if up_text:
@@ -448,6 +456,7 @@ while True:
                 if p['instrument']['assetType'] == 'EQUITY':
                     positiondict[p['instrument']['symbol']] = p['longQuantity']
             symbols = parse_alert(down_text)
+            print('received sell signal, pulling {}'.format(symbols))
             symbols_i_own = [x for x in symbols if x in positiondict.keys()]
             for s in symbols_i_own:
                 orderinfo = {'symbol': s,
