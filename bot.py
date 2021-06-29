@@ -92,7 +92,8 @@ def read_email_from_gmail():
 @limits(calls=120, period=60)
 def td_client_request(option, c, ticker=False, orderinfo=False):
     num = 0
-    while num <= 10:
+    while num <= 3:
+        time.sleep(1)
         try:
             if option == 'get_price_history':
                 data = c.get_price_history(ticker,
@@ -125,15 +126,12 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
 
                     # we are going to place a trailing stop order for the order we just placed.
                     obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                    obj2.set_order_type(OrderType.STOP)
+                    obj2.set_order_type(OrderType.TRAILING_STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
+                    obj2.set_stop_price_offset(-2)
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
-                    obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
-                    stoploss = round(orderinfo['stoploss'], 2)
-                    if stoploss == 0.00:
-                        stoploss = 0.01
-                    obj2.set_stop_price(stoploss)
+                    obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
                     order2 = obj2.build()
                     x = c.place_order(TD_ACCOUNT, order2)
                     if str(x.status_code).startswith('2'):
@@ -142,7 +140,8 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     else:
                         print('something went wrong')
                 else:
-                    print('something went wrong')
+                    num += 1
+                    print(x.json()['error'])
             if option == 'get_positions':
                 return c.get_accounts(fields=Client.Account.Fields.POSITIONS).json()[0]
             if option == 'sell_order':
@@ -202,7 +201,7 @@ while True:
             time.sleep(1)
             pass
     cash_balance = account_info['securitiesAccount']['currentBalances']['liquidationValue']
-    cash_available_for_trade = account_info['securitiesAccount']['currentBalances']['cashAvailableForTrading']
+    cash_available_for_trade = account_info['securitiesAccount']['projectedBalances']['cashAvailableForTrading']
     up_text, down_text = read_email_from_gmail()
     while True:
         try:
