@@ -158,6 +158,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 order = obj.build()
                 x = c.place_order(TD_ACCOUNT, order)
                 if str(x.status_code).startswith('2'):
+                    print('placed sell order successfully')
                     return True
                 else:
                     print('something went wrong')
@@ -209,7 +210,14 @@ while True:
             pass
     cash_balance = account_info['securitiesAccount']['currentBalances']['liquidationValue']
     cash_available_for_trade = account_info['securitiesAccount']['projectedBalances']['cashAvailableForTrading']
-    up_text, down_text = read_email_from_gmail()
+    while True:
+        try:
+            up_text, down_text = read_email_from_gmail()
+            break
+        except:
+            sys.stdout.write('x')
+            time.sleep(1)
+            pass
     while True:
         try:
 
