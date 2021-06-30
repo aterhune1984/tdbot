@@ -54,6 +54,8 @@ def read_email_from_gmail():
                         if isinstance(response, tuple):
                             #msg = email.message_from_bytes(response[1])
                             # decode the email subject
+                            # test how old the email is, if this is an old email, we dont want to be taking action based on this
+                            # if its older than 5 min, ignore and delete the email.
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
