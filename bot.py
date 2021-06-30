@@ -7,7 +7,7 @@ import sys
 from bs4 import BeautifulSoup
 
 from apscheduler.schedulers.background import BackgroundScheduler
-
+import pytz
 import datetime
 from tda import auth
 from tda.client import Client
@@ -36,6 +36,7 @@ def read_email_from_gmail():
         imap = imaplib.IMAP4_SSL(SMTP_SERVER)
         imap.login(FROM_EMAIL, FROM_PWD)
         imap.select('inbox')
+        pacific = pytz.timezone('US/Pacific')
 
         status, messages = imap.search(None, 'ALL')
         messages = messages[0].split(b' ')
@@ -49,36 +50,42 @@ def read_email_from_gmail():
                     # you can delete the for loop for performance if you have a long list of emails
                     # because it is only for printing the SUBJECT of target email to delete
                     for response in msg:
+
                         if isinstance(response, tuple):
                             #msg = email.message_from_bytes(response[1])
                             # decode the email subject
-                            try:
-                                soup = BeautifulSoup(response[1],'html.parser')
-                            except:
-                                print('i failed')
-                            try:
-                                if 'AA_aterhune1984' in soup.get_text() or ' SOLD ' in soup.get_text():
-                                    quit=True
-                                    imap.store(mail, "+FLAGS", "\\Deleted")
-                                    break
-                                elif 'tradingview_macd_long_sell' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
-                                    quit = True
-                                    down_text = soup.get_text().split('\nAlert')[1]
-                                    imap.store(mail, "+FLAGS", "\\Deleted")
-                                    break
-                                    # mark the mail as deleted
-                                elif 'tradingview_macd_long' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
-                                    quit = True
-                                    up_text = soup.get_text().split('\nAlert')[1]
-                                    imap.store(mail, "+FLAGS", "\\Deleted")
-                                    break
-                                else:
-                                    quit = True
-                                    imap.store(mail, "+FLAGS", "\\Deleted")
-                                    break
-                            except Exception as e:
-                                print(e)
-                        imap.store(mail, "+FLAGS", "\\Deleted")
+                            timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
+                                str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
+                                '%a, %d %b %Y %H:%M:%S %z')
+                            if timediff.total_seconds() < 300:
+                                try:
+                                    soup = BeautifulSoup(response[1],'html.parser')
+                                except:
+                                    print('i failed')
+                                try:
+                                    if 'AA_aterhune1984' in soup.get_text() or ' SOLD ' in soup.get_text():
+                                        quit=True
+                                        imap.store(mail, "+FLAGS", "\\Deleted")
+                                        break
+                                    elif 'tradingview_macd_long_sell' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
+                                        quit = True
+                                        down_text = soup.get_text().split('\nAlert')[1]
+                                        imap.store(mail, "+FLAGS", "\\Deleted")
+                                        break
+                                        # mark the mail as deleted
+                                    elif 'tradingview_macd_long' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
+                                        quit = True
+                                        up_text = soup.get_text().split('\nAlert')[1]
+                                        imap.store(mail, "+FLAGS", "\\Deleted")
+                                        break
+                                    else:
+                                        quit = True
+                                        imap.store(mail, "+FLAGS", "\\Deleted")
+                                        break
+                                except Exception as e:
+                                    print(e)
+                            else:
+                                imap.store(mail, "+FLAGS", "\\Deleted")
                     if quit:
                         break
 
