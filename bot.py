@@ -50,23 +50,30 @@ def read_email_from_gmail():
                     # because it is only for printing the SUBJECT of target email to delete
                     for response in msg:
                         if isinstance(response, tuple):
-                            msg = email.message_from_bytes(response[1])
+                            #msg = email.message_from_bytes(response[1])
                             # decode the email subject
-                            soup = BeautifulSoup(msg._payload, 'html.parser')
+                            try:
+                                soup = BeautifulSoup(response[1],'html.parser')
+                            except:
+                                print('i failed')
                             try:
                                 if 'AA_aterhune1984' in soup.get_text() or ' SOLD ' in soup.get_text():
                                     quit=True
                                     imap.store(mail, "+FLAGS", "\\Deleted")
                                     break
-                                if 'tradingview_macd_long_sell' in soup.get_text().split('\nAlert')[1].replace('=\r\n', ''):
+                                elif 'tradingview_macd_long_sell' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
                                     quit = True
                                     down_text = soup.get_text().split('\nAlert')[1]
                                     imap.store(mail, "+FLAGS", "\\Deleted")
                                     break
                                     # mark the mail as deleted
-                                elif 'tradingview_macd_long' in soup.get_text().split('\nAlert')[1].replace('=\r\n', ''):
+                                elif 'tradingview_macd_long' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
                                     quit = True
                                     up_text = soup.get_text().split('\nAlert')[1]
+                                    imap.store(mail, "+FLAGS", "\\Deleted")
+                                    break
+                                else:
+                                    quit = True
                                     imap.store(mail, "+FLAGS", "\\Deleted")
                                     break
                             except Exception as e:
