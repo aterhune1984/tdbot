@@ -145,7 +145,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     obj2.set_order_type(OrderType.TRAILING_STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(-20)
+                    obj2.set_stop_price_offset(-10)
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                     obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
                     order2 = obj2.build()
@@ -248,7 +248,13 @@ while True:
             else:
                 reduced_symbols = symbols
             print('received buy signal, pulling {}'.format(reduced_symbols))
-
+            positions = td_client_request('get_positions', c)
+            positiondict = {}
+            for p in positions['securitiesAccount']['positions']:
+                if p['instrument']['assetType'] == 'EQUITY':
+                    positiondict[p['instrument']['symbol']] = p['longQuantity']
+            symbols_i_own = [x for x in symbols if x in positiondict.keys()]
+            reduced_symbols = [x for x in reduced_symbols if x not in symbols_i_own]
             if reduced_symbols:
                 prices = td_client_request('get_quotes', c, reduced_symbols)
                 # get list of symbols that I can afford

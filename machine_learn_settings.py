@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from random import randint
 url = 'https://www.tradingview.com/chart/02A8Mtco/'  # enter your trading view profile link here.
 min_value = 1  # enter your minimum stop loss value.
 max_value = 50  # enter your maximum stop loss value.
@@ -23,42 +24,62 @@ def run_script():
 
     browser = Firefox(options=opts)
     browser.get("https://www.tradingview.com/#signin")
-    WebDriverWait(browser, 2).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div/div[1]/div[4]/div/span')))
-
+    WebDriverWait(browser, 600).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[6]/div/div[2]/div/div/div/div/div/div/div[1]/div[4]/div/span')))
+    time.sleep(randint(1, 4))
     browser.find_element_by_xpath('/html/body/div[6]/div/div[2]/div/div/div/div/div/div/div[1]/div[4]/div/span').click()
-    WebDriverWait(browser, 2).until(EC.presence_of_element_located((By.XPATH, "//*[contains(@id,'email-signin__user-name-input_')]")))
+    WebDriverWait(browser, 600).until(EC.presence_of_element_located((By.XPATH, "//*[contains(@id,'email-signin__user-name-input_')]")))
+    time.sleep(randint(1, 4))
+
     # email-signin__user-name-input__75b8e4e7-dcde-4d45-8c2e-89330575b293
     username = browser.find_element_by_xpath("//*[contains(@id,'email-signin__user-name-input_')]")
+    time.sleep(randint(1, 4))
+
     username.send_keys(user)
     password = browser.find_element_by_xpath("//*[contains(@id,'email-signin__password-input_')]")
+    time.sleep(randint(1, 4))
+
     password.send_keys('l+<9UgZr)GMK@&18df<RQuWQrl-,}Gt')
     submit_button = browser.find_element_by_xpath('/html/body/div[6]/div/div[2]/div/div/div/div/div/div/form/div[5]/div[2]/button/span[2]')
+    time.sleep(randint(1, 4))
+
     submit_button.click()
-    WebDriverWait(browser, 2).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[6]/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/h2/a')))
+    WebDriverWait(browser, 600).until(EC.presence_of_element_located((By.XPATH, '/html/body/div[3]/div[6]/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/h2/a')))
 
     browser.get('https://www.tradingview.com/chart/1WKRpxiU/')
     while True:
-        input("Press Enter to continue...")
-        totalprofit = 0
-        symbols = ['BTBT','CGEN','CRESY','DOYU','DPW','DUFRY','ELVT','EQOS','FLMN','DSKE','FI','FLMN','FSM','HBM','HMY','IRIX','ITRG','KODK','LJPC','MDCA','MF','MMDA1','PRVB','QTNT','TLMD','YTRA']
-        for s in symbols:
-            WebDriverWait(browser, 2).until(EC.presence_of_element_located(
-                (By.XPATH, '//*[@id="header-toolbar-symbol-search"]')))
-            searchfield = browser.find_element_by_xpath('//*[@id="header-toolbar-symbol-search"]')
-            searchfield.click()
-            WebDriverWait(browser, 2).until(EC.presence_of_element_located(
-                (By.CSS_SELECTOR, '.search-Hsmn_0WX')))
-            symbolbar = browser.find_element_by_css_selector('.search-Hsmn_0WX')
-            symbolbar.send_keys(s)
-            symbolbar.send_keys(Keys.ENTER)
+        try:
+            input("Press Enter to continue...")
+            totalprofit = 0
+            positive = 0
+            symbols = ['ADIL','AFMD','CAPR','CTXR','GROY','ORGS','SDPI','SND','WPG']
+            for s in symbols:
+                WebDriverWait(browser, 2).until(EC.presence_of_element_located(
+                    (By.XPATH, '//*[@id="header-toolbar-symbol-search"]')))
+                searchfield = browser.find_element_by_xpath('//*[@id="header-toolbar-symbol-search"]')
+                searchfield.click()
+                WebDriverWait(browser, 2).until(EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, '.search-Hsmn_0WX')))
+                symbolbar = browser.find_element_by_css_selector('.search-Hsmn_0WX')
+                symbolbar.send_keys(s)
+                symbolbar.send_keys(Keys.ENTER)
+                try:
+                    WebDriverWait(browser, 10).until(EC.text_to_be_present_in_element(
+                        (By.CSS_SELECTOR, '.report-data'), 'Net Profit'))
+                    time.sleep(1)
+                    profit = browser.find_element_by_css_selector('.report-data')
+                    number = str(float(profit.text.split('$\u2009')[1].split('\n')[0]))
+                    print(s + " " + number)
+                    if float(number) > 0:
+                        positive += 1
+                    totalprofit += float(profit.text.split('$\u2009')[1].split('\n')[0])
+                except:
+                    totalprofit += 0
 
-            WebDriverWait(browser, 10).until(EC.text_to_be_present_in_element(
-                (By.CSS_SELECTOR, '.report-data'), 'Net Profit'))
-            time.sleep(1)
-            profit = browser.find_element_by_css_selector('.report-data')
-            totalprofit += float(profit.text.split('$\u2009')[1].split('\n')[0])
-        print(totalprofit)
-
+            print("    " + str(totalprofit))
+            print(str(positive) + ' / ' + str(len(symbols)))
+        except Exception as e:
+            print('try again')
+            pass
     # // *[ @ id = "email-signin__password-input__7bba0683-9868-4eb9-930b-b1f39cde1c39"]
     # // *[ @ id = "email-signin__user-name-input__75b8e4e7-dcde-4d45-8c2e-89330575b293"]
 #  l+<9UgZr)GMK@&18df<RQuWQrl-,}Gt
