@@ -1,0 +1,2 @@
+#!/bin/bash
+cd /home/pi/tdbot; while ((1)); do if [ $(ls -lart debug.0* | wc -l) -gt 3 ]; then for file in $(ls -lat | grep debug | tail -n +4 | awk '{printf $NF" "}'); do rm $file; done; sleep 1; fi; done
