@@ -198,6 +198,7 @@ token_path = './token.pickle'
 api_key = '{}@AMER.OAUTHAP'.format(ameritrade)
 redirect_uri = 'http://localhost:8000'
 restricted_symbols = ['RXT']
+print('Starting TDBOT...')
 
 while True:
     backtest_dict = {}
