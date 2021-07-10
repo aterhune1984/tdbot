@@ -18,6 +18,7 @@ import time
 import imaplib
 import email
 import traceback
+import os
 import random
 import math
 
@@ -193,8 +194,7 @@ global runningpl
 runningpl = 0
 
 
-
-token_path = './token.pickle'
+token_path = '{}/token.pickle'.format(os.getcwd())
 api_key = '{}@AMER.OAUTHAP'.format(ameritrade)
 redirect_uri = 'http://localhost:8000'
 restricted_symbols = ['RXT']
