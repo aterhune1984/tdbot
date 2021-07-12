@@ -240,7 +240,7 @@ while True:
             time.sleep(1)
             pass
     # test if we are in regular market hours
-    if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= datetime.datetime.fromisoformat(marketstart) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
+    if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=15)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
         if up_text:
             #uptext_handler
             symbols = parse_alert(up_text)
