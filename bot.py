@@ -146,7 +146,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     obj2.set_order_type(OrderType.TRAILING_STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(-10)
+                    obj2.set_stop_price_offset(-3)
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                     obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
                     order2 = obj2.build()
