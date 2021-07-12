@@ -244,8 +244,8 @@ while True:
         if up_text:
             #uptext_handler
             symbols = parse_alert(up_text)
-            if len(symbols) > 5:
-                reduced_symbols = random.sample(symbols, 5)  # pick 5 stocks at random, too many will take too long
+            if len(symbols) > 10:
+                reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
             else:
                 reduced_symbols = symbols
             print('received buy signal, pulling {}'.format(reduced_symbols))
@@ -264,17 +264,18 @@ while True:
                     affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
                     affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
                     if affordable_symbols:
-                        symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
-                        number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol_to_invest]['lastPrice'])
-                        print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
-                                                                                    symbol_to_invest,
-                                                                                    prices[symbol_to_invest]['lastPrice'],
-                                                                                    prices[symbol_to_invest]['lastPrice'] - (prices[symbol_to_invest]['lastPrice']*.02)))
-                        orderinfo = {'symbol': symbol_to_invest,
-                                     'qty': number_to_buy,
-                                     'price': prices[symbol_to_invest]['lastPrice'],
-                                     'stoploss': prices[symbol_to_invest]['lastPrice'] - (prices[symbol_to_invest]['lastPrice']*.02)}
-                        td_client_request('place_order', c, orderinfo=orderinfo)
+                        for symbol in affordable_symbols:
+                            #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
+                            number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
+                            print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
+                                                                                        symbol,
+                                                                                        prices[symbol]['lastPrice'],
+                                                                                        prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.02)))
+                            orderinfo = {'symbol': symbol,
+                                         'qty': number_to_buy,
+                                         'price': prices[symbol]['lastPrice'],
+                                         'stoploss': prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.03)}
+                            td_client_request('place_order', c, orderinfo=orderinfo)
 
                 pass
         if down_text:
