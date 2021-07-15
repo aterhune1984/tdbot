@@ -146,7 +146,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     obj2.set_order_type(OrderType.TRAILING_STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(-2)
+                    obj2.set_stop_price_offset(-4)
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                     obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
                     order2 = obj2.build()
@@ -270,11 +270,11 @@ while True:
                             print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
                                                                                         symbol,
                                                                                         prices[symbol]['lastPrice'],
-                                                                                        prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.02)))
+                                                                                        prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.04)))
                             orderinfo = {'symbol': symbol,
                                          'qty': number_to_buy,
                                          'price': prices[symbol]['lastPrice'],
-                                         'stoploss': prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.02)}
+                                         'stoploss': prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.04)}
                             td_client_request('place_order', c, orderinfo=orderinfo)
 
                 pass
