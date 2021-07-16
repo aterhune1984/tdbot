@@ -146,7 +146,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     obj2.set_order_type(OrderType.TRAILING_STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(-4)
+                    obj2.set_stop_price_offset(-5)
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                     obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
                     order2 = obj2.build()
@@ -242,42 +242,43 @@ while True:
     # test if we are in regular market hours
     if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
         if up_text:
-            #uptext_handler
-            symbols = parse_alert(up_text)
-            if len(symbols) > 10:
-                reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
-            else:
-                reduced_symbols = symbols
-            print('received buy signal, pulling {}'.format(reduced_symbols))
-            positions = td_client_request('get_positions', c)
-            positiondict = {}
-            for p in positions['securitiesAccount']['positions']:
-                if p['instrument']['assetType'] == 'EQUITY':
-                    positiondict[p['instrument']['symbol']] = p['longQuantity']
-            symbols_i_own = [x for x in symbols if x in positiondict.keys()]
-            reduced_symbols = [x for x in reduced_symbols if x not in symbols_i_own]
-            if reduced_symbols:
-                prices = td_client_request('get_quotes', c, reduced_symbols)
-                # get list of symbols that I can afford
-                num_symbols = 20
-                if cash_available_for_trade > (cash_balance / num_symbols):
-                    affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
-                    affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
-                    if affordable_symbols:
-                        for symbol in affordable_symbols:
-                            #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
-                            number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
-                            print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
-                                                                                        symbol,
-                                                                                        prices[symbol]['lastPrice'],
-                                                                                        prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.04)))
-                            orderinfo = {'symbol': symbol,
-                                         'qty': number_to_buy,
-                                         'price': prices[symbol]['lastPrice'],
-                                         'stoploss': prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.04)}
-                            td_client_request('place_order', c, orderinfo=orderinfo)
+            if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=15)):
+                #uptext_handler
+                symbols = parse_alert(up_text)
+                if len(symbols) > 10:
+                    reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
+                else:
+                    reduced_symbols = symbols
+                print('received buy signal, pulling {}'.format(reduced_symbols))
+                positions = td_client_request('get_positions', c)
+                positiondict = {}
+                for p in positions['securitiesAccount']['positions']:
+                    if p['instrument']['assetType'] == 'EQUITY':
+                        positiondict[p['instrument']['symbol']] = p['longQuantity']
+                symbols_i_own = [x for x in symbols if x in positiondict.keys()]
+                reduced_symbols = [x for x in reduced_symbols if x not in symbols_i_own]
+                if reduced_symbols:
+                    prices = td_client_request('get_quotes', c, reduced_symbols)
+                    # get list of symbols that I can afford
+                    num_symbols = 20
+                    if cash_available_for_trade > (cash_balance / num_symbols):
+                        affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
+                        affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
+                        if affordable_symbols:
+                            for symbol in affordable_symbols:
+                                #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
+                                number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
+                                print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
+                                                                                            symbol,
+                                                                                            prices[symbol]['lastPrice'],
+                                                                                            prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.05)))
+                                orderinfo = {'symbol': symbol,
+                                             'qty': number_to_buy,
+                                             'price': prices[symbol]['lastPrice'],
+                                             'stoploss': prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.05)}
+                                td_client_request('place_order', c, orderinfo=orderinfo)
 
-                pass
+                    pass
         if down_text:
             positions = td_client_request('get_positions', c)
             positiondict = {}
