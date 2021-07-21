@@ -151,16 +151,25 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'get_positions':
                 return c.get_accounts(fields=Client.Account.Fields.POSITIONS).json()[0]
             if option == 'sell_order':
-                obj = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                obj.set_session(Session.NORMAL)
-                obj.set_duration(Duration.DAY)
-                order = obj.build()
-                x = c.place_order(TD_ACCOUNT, order)
-                if str(x.status_code).startswith('2'):
-                    print('placed sell order successfully')
-                    return True
-                else:
-                    print('something went wrong')
+                x = c.get_orders_by_path(TD_ACCOUNT, status=Client.Order.Status.FILLED)
+                for y in x.json():
+                    sym = y['orderLegCollection'][0]['instrument']['symbol']
+                    if orderinfo['symbol'] == sym:
+                        x = c.cancel_order(y['childOrderStrategies'][0]['orderId'], TD_ACCOUNT)
+                        if str(x.status_code).startswith('2'):
+                            print('canceled trailing stop order successfully')
+
+                            obj = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
+                            obj.set_session(Session.NORMAL)
+                            obj.set_duration(Duration.DAY)
+                            order = obj.build()
+                            x = c.place_order(TD_ACCOUNT, order)
+                            if str(x.status_code).startswith('2'):
+                                print('placed sell order successfully')
+                                return True
+                            else:
+                                num += 1
+                                print('something went wrong')
         except Exception as e:
             num += 1
             time.sleep(1)
