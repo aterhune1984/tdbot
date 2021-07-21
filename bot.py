@@ -130,35 +130,24 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
-                obj1 = equity_buy_market(orderinfo['symbol'], orderinfo['qty'])
+                obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
 
-                order1 = obj1.build()
-                x = c.place_order(TD_ACCOUNT, order1)
-                time.sleep(1)
-
+                obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
+                obj2.set_order_type(OrderType.TRAILING_STOP)
+                obj2.set_session(Session.NORMAL)
+                obj2.set_duration(Duration.GOOD_TILL_CANCEL)
+                obj2.set_stop_price_offset(-5)
+                obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
+                obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
+                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
                 if str(x.status_code).startswith('2'):
-
-
-                    # we are going to place a trailing stop order for the order we just placed.
-                    obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                    obj2.set_order_type(OrderType.TRAILING_STOP)
-                    obj2.set_session(Session.NORMAL)
-                    obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(-5)
-                    obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
-                    obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
-                    order2 = obj2.build()
-                    x = c.place_order(TD_ACCOUNT, order2)
-                    if str(x.status_code).startswith('2'):
-                        print('placed both orders succesfully')
-                        return True
-                    else:
-                        print('something went wrong')
+                    print('placed both orders succesfully')
+                    return True
                 else:
-                    num += 1
-                    print(x.json()['error'])
+                    print('something went wrong')
+
             if option == 'get_positions':
                 return c.get_accounts(fields=Client.Account.Fields.POSITIONS).json()[0]
             if option == 'sell_order':
@@ -242,7 +231,7 @@ while True:
     # test if we are in regular market hours
     if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
         if up_text:
-            if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=20)):
+            if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=30)):
                 #uptext_handler
                 symbols = parse_alert(up_text)
                 if len(symbols) > 10:
