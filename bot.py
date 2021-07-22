@@ -13,7 +13,7 @@ from tda import auth
 from tda.client import Client
 from tda.orders.generic import OrderBuilder
 from tda.orders.equities import equity_sell_limit, equity_buy_market,equity_buy_limit, equity_sell_market
-from tda.orders.common import Duration, Session,OrderType,StopPriceLinkType,StopPriceLinkBasis, first_triggers_second
+from tda.orders.common import Duration, Session,OrderType,StopPriceLinkType,StopPriceLinkBasis, first_triggers_second,one_cancels_other
 import time
 import imaplib
 import email
@@ -130,22 +130,31 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
-                obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
+                obj1 = equity_buy_market(orderinfo['symbol'], orderinfo['qty'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
 
                 obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                obj2.set_order_type(OrderType.TRAILING_STOP)
+                obj2.set_order_type(OrderType.STOP)
                 obj2.set_session(Session.NORMAL)
                 obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                obj2.set_stop_price_offset(-5)
-                obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
-                obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
-                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
+                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.01))
+                obj2.set_stop_price_link_basis(StopPriceLinkBasis.TRIGGER)
+                obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
+
+
+                obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'],orderinfo['price']+(orderinfo['price']*.02))
+                obj3.set_order_type(OrderType.LIMIT)
+                obj3.set_session(Session.NORMAL)
+                obj3.set_duration(Duration.GOOD_TILL_CANCEL)
+
+
+                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
                 if str(x.status_code).startswith('2'):
                     print('placed both orders succesfully')
                     return True
                 else:
+                    num += 1
                     print('something went wrong')
 
             if option == 'get_positions':
@@ -155,21 +164,22 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 for y in x.json():
                     sym = y['orderLegCollection'][0]['instrument']['symbol']
                     if orderinfo['symbol'] == sym:
-                        x = c.cancel_order(y['childOrderStrategies'][0]['orderId'], TD_ACCOUNT)
-                        if str(x.status_code).startswith('2'):
-                            print('canceled trailing stop order successfully')
-
-                            obj = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                            obj.set_session(Session.NORMAL)
-                            obj.set_duration(Duration.DAY)
-                            order = obj.build()
-                            x = c.place_order(TD_ACCOUNT, order)
+                        for i, cos in enumerate(y['childOrderStrategies']):
+                            x = c.cancel_order(cos['childOrderStrategies'][i]['orderId'], TD_ACCOUNT)
                             if str(x.status_code).startswith('2'):
-                                print('placed sell order successfully')
-                                return True
-                            else:
-                                num += 1
-                                print('something went wrong')
+                                print('canceled trailing stop order successfully')
+
+                                obj = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
+                                obj.set_session(Session.NORMAL)
+                                obj.set_duration(Duration.DAY)
+                                order = obj.build()
+                                x = c.place_order(TD_ACCOUNT, order)
+                                if str(x.status_code).startswith('2'):
+                                    print('placed sell order successfully')
+                                    return True
+                                else:
+                                    num += 1
+                                    print('something went wrong')
         except Exception as e:
             num += 1
             time.sleep(1)
