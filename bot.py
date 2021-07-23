@@ -268,7 +268,7 @@ while True:
                 if reduced_symbols:
                     prices = td_client_request('get_quotes', c, reduced_symbols)
                     # get list of symbols that I can afford
-                    num_symbols = 20
+                    num_symbols = 50
                     if cash_available_for_trade > (cash_balance / num_symbols):
                         affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
                         affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
