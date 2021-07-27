@@ -130,7 +130,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
-                obj1 = equity_buy_market(orderinfo['symbol'], orderinfo['qty'])
+                obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
 
@@ -138,7 +138,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj2.set_order_type(OrderType.STOP)
                 obj2.set_session(Session.NORMAL)
                 obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.01))
+                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.02))
                 obj2.set_stop_price_link_basis(StopPriceLinkBasis.TRIGGER)
                 obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
 
@@ -149,7 +149,8 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj3.set_duration(Duration.GOOD_TILL_CANCEL)
 
 
-                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
+                #x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
+                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
                 if str(x.status_code).startswith('2'):
                     print('placed both orders succesfully')
                     return True
@@ -268,7 +269,7 @@ while True:
                 if reduced_symbols:
                     prices = td_client_request('get_quotes', c, reduced_symbols)
                     # get list of symbols that I can afford
-                    num_symbols = 50
+                    num_symbols = 20
                     if cash_available_for_trade > (cash_balance / num_symbols):
                         affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
                         affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
