@@ -135,12 +135,13 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj1.set_duration(Duration.DAY)
 
                 obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                obj2.set_order_type(OrderType.STOP)
+                obj2.set_order_type(OrderType.TRAILING_STOP)
                 obj2.set_session(Session.NORMAL)
                 obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.02))
-                obj2.set_stop_price_link_basis(StopPriceLinkBasis.TRIGGER)
-                obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
+                #obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.02))
+                obj2.set_stop_price_offset(-2)
+                obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
+                obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
 
 
                 obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'],orderinfo['price']+(orderinfo['price']*.02))
@@ -269,7 +270,7 @@ while True:
                 if reduced_symbols:
                     prices = td_client_request('get_quotes', c, reduced_symbols)
                     # get list of symbols that I can afford
-                    num_symbols = 20
+                    num_symbols = 30
                     if cash_available_for_trade > (cash_balance / num_symbols):
                         affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
                         affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
