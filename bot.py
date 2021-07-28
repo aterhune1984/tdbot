@@ -135,12 +135,11 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj1.set_duration(Duration.DAY)
 
                 obj2 = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
-                obj2.set_order_type(OrderType.TRAILING_STOP)
+                obj2.set_order_type(OrderType.STOP)
                 obj2.set_session(Session.NORMAL)
                 obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                #obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.02))
-                obj2.set_stop_price_offset(-2)
-                obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
+                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.01))
+                obj2.set_stop_price_link_basis(StopPriceLinkBasis.TRIGGER)
                 obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
 
 
@@ -150,8 +149,8 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj3.set_duration(Duration.GOOD_TILL_CANCEL)
 
 
-                #x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
-                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
+                x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
+                #x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
                 if str(x.status_code).startswith('2'):
                     print('placed both orders succesfully')
                     return True
