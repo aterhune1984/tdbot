@@ -22,6 +22,7 @@ import os
 import random
 import math
 import pandas_ta as ta
+import requests
 
 url = "https://api.tdameritrade.com/"
 scheduler = BackgroundScheduler()
@@ -105,7 +106,28 @@ def read_email_from_gmail():
         print(str(e))
 
 
+def consolidate(data, thirtymincount=2):
+    jsonobj=[]
+    num = -1
+    for i, e in enumerate(data):
+        num += 1
+        if num <= thirtymincount-1:
+            if num == 0:
+                open = e['open']
+                high = max([x['high'] for x in data][i:i+thirtymincount])
+                low = min([x['low'] for x in data][i:i+thirtymincount])
+                vol = sum([x['volume'] for x in data][i:i+thirtymincount])
+            if num == thirtymincount-1:
+                close = e['close']
+        if num == thirtymincount-1:
+            jsonobj.append({'open': open, 'high': high, 'low': low, "close": close, "volume": vol})
+            num = -1
+    return jsonobj
 
+
+def unix_convert(ts):
+    date = datetime.datetime.utcfromtimestamp(ts/1000)
+    return date
 
 @sleep_and_retry
 @limits(calls=120, period=60)
@@ -132,17 +154,44 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
-
-                data = c.get_price_history(orderinfo['symbol'],
+                proceed = False
+                data1 = c.get_price_history(orderinfo['symbol'],
                                            frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
                                            frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
-                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=5),
+                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=30),
                                            end_datetime=datetime.datetime.today() + datetime.timedelta(days=1),
                                            need_extended_hours_data=False)
-                data_json = data.json()
-                df = ta.DataFrame(data_json['candles'], columns=['open', 'high', 'low', 'close', 'volume', 'datetime'])
-                df['atr'] = ta.atr(df['high'], df['low'], df['close'])
-                atrval = float(df[-1:]['atr'])
+                data1_json = data1.json()
+
+                df1 = ta.DataFrame(data1_json['candles'], columns=['open', 'high', 'low', 'close', 'volume', 'datetime'])
+
+                df1['date'] = df1['datetime'].map(lambda x: unix_convert(x))
+                df2 = df1.resample('60min', on='date').agg(
+                    {'volume': 'sum', 'open': 'first', 'close': 'last', 'high': 'max', 'low': 'min'})
+                df3 = df1.resample('240min', on='date').agg(
+                    {'volume': 'sum', 'open': 'first', 'close': 'last', 'high': 'max', 'low': 'min'})
+
+                macd1 = df1.ta.macd(fast=3, slow=10, signal=16)
+                macd2 = df2.ta.macd(fast=3, slow=10, signal=16)
+                macd3 = df3.ta.macd(fast=3, slow=10, signal=16)
+
+                # test if are still in the correct condition for the three macds
+                lowtimehigher = float(macd1['MACDh_3_10_16'][-2:-1]) < float(macd1['MACDh_3_10_16'][-1:])
+                midtimehigher = float(macd2['MACDh_3_10_16'][-2:-1]) < float(macd2['MACDh_3_10_16'][-1:])
+                longtimehigher = float(macd3['MACDh_3_10_16'][-2:-1]) < float(macd3['MACDh_3_10_16'][-1:])
+
+                lastlowtimelower = float(macd1['MACDh_3_10_16'][-3:-2]) > float(macd1['MACDh_3_10_16'][-2:-1])
+                lastmidtimelower = float(macd2['MACDh_3_10_16'][-3:-2]) > float(macd2['MACDh_3_10_16'][-2:-1])
+                lastlongtimelower = float(macd3['MACDh_3_10_16'][-3:-2]) > float(macd3['MACDh_3_10_16'][-2:-1])
+
+
+                if lowtimehigher and midtimehigher and longtimehigher and (lastlongtimelower or lastmidtimelower or lastlowtimelower):
+                    proceed = True
+
+                if not proceed:
+                    return False
+                df1['atr'] = ta.atr(df1['high'], df1['low'], df1['close'])
+                atrval = float(df1[-1:]['atr'])
                 obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
@@ -165,7 +214,10 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
                 #x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
                 if str(x.status_code).startswith('2'):
-                    print('placed both orders succesfully')
+                    print('buying {} of {}  at {} with a stoploss of {}'.format(orderinfo['qty'],
+                                                                                orderinfo['symbol'],
+                                                                                orderinfo['price'],
+                                                                                orderinfo['price']-(atrval*2)))
                     return True
                 else:
                     num += 1
@@ -226,7 +278,7 @@ while True:
     backtest_dict = {}
     try:
         c = auth.client_from_token_file(token_path, api_key)
-    except FileNotFoundError:
+    except:
         from selenium import webdriver
 
         with webdriver.Firefox() as driver:
@@ -262,7 +314,8 @@ while True:
             time.sleep(1)
             pass
     # test if we are in regular market hours
-    if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
+    #if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
+    if True:
         if up_text:
             if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=15)):
             #if True:
@@ -291,10 +344,7 @@ while True:
                             for symbol in affordable_symbols:
                                 #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
                                 number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
-                                print('buying {} of {}  at {} with a stoploss of {}'.format(number_to_buy,
-                                                                                            symbol,
-                                                                                            prices[symbol]['lastPrice'],
-                                                                                            prices[symbol]['lastPrice'] - (prices[symbol]['lastPrice']*.05)))
+
                                 orderinfo = {'symbol': symbol,
                                              'qty': number_to_buy,
                                              'price': prices[symbol]['lastPrice'],
