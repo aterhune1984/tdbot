@@ -21,6 +21,7 @@ import traceback
 import os
 import random
 import math
+import pandas_ta as ta
 
 url = "https://api.tdameritrade.com/"
 scheduler = BackgroundScheduler()
@@ -60,7 +61,8 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            if timediff.total_seconds() < 300:
+                            #if timediff.total_seconds() < 60:
+                            if True:
                                 try:
                                     soup = BeautifulSoup(response[1],'html.parser')
                                 except:
@@ -116,8 +118,8 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 data = c.get_price_history(ticker,
                                            frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
                                            frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
-                                           start_datetime=datetime.datetime.now() - datetime.timedelta(60),
-                                           end_datetime=datetime.datetime.now(),
+                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=5),
+                                           end_datetime=datetime.date.today() + datetime.timedelta(days=1),
                                            need_extended_hours_data=False)
 
                 return_val = data.json()
@@ -130,6 +132,17 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
+
+                data = c.get_price_history(orderinfo['symbol'],
+                                           frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
+                                           frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
+                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=5),
+                                           end_datetime=datetime.datetime.today() + datetime.timedelta(days=1),
+                                           need_extended_hours_data=False)
+                data_json = data.json()
+                df = ta.DataFrame(data_json['candles'], columns=['open', 'high', 'low', 'close', 'volume', 'datetime'])
+                df['atr'] = ta.atr(df['high'], df['low'], df['close'])
+                atrval = float(df[-1:]['atr'])
                 obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
@@ -138,12 +151,12 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj2.set_order_type(OrderType.STOP)
                 obj2.set_session(Session.NORMAL)
                 obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                obj2.set_stop_price(orderinfo['price']-(orderinfo['price']*.01))
+                obj2.set_stop_price(orderinfo['price']-(atrval*2))
                 obj2.set_stop_price_link_basis(StopPriceLinkBasis.TRIGGER)
                 obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
 
 
-                obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'],orderinfo['price']+(orderinfo['price']*.02))
+                obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'],orderinfo['price']+(atrval*4))
                 obj3.set_order_type(OrderType.LIMIT)
                 obj3.set_session(Session.NORMAL)
                 obj3.set_duration(Duration.GOOD_TILL_CANCEL)
@@ -251,7 +264,8 @@ while True:
     # test if we are in regular market hours
     if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
         if up_text:
-            if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=30)):
+            if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=15)):
+            #if True:
                 #uptext_handler
                 symbols = parse_alert(up_text)
                 if len(symbols) > 10:
