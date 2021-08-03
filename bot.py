@@ -154,22 +154,23 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
-                proceed = False
+
                 data1 = c.get_price_history(orderinfo['symbol'],
-                                           frequency_type=Client.PriceHistory.FrequencyType.MINUTE,
-                                           frequency=Client.PriceHistory.Frequency.EVERY_FIFTEEN_MINUTES,
-                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=30),
+                                           frequency=Client.PriceHistory.Frequency.DAILY,
+                                           start_datetime=datetime.datetime.now() - datetime.timedelta(days=200),
                                            end_datetime=datetime.datetime.today() + datetime.timedelta(days=1),
                                            need_extended_hours_data=False)
                 data1_json = data1.json()
 
                 df1 = ta.DataFrame(data1_json['candles'], columns=['open', 'high', 'low', 'close', 'volume', 'datetime'])
 
+                '''
                 df1['date'] = df1['datetime'].map(lambda x: unix_convert(x))
                 df2 = df1.resample('60min', on='date').agg(
                     {'volume': 'sum', 'open': 'first', 'close': 'last', 'high': 'max', 'low': 'min'})
-                df3 = df1.resample('240min', on='date').agg(
+                df3 = df1.resample('240min', than on='date').agg(
                     {'volume': 'sum', 'open': 'first', 'close': 'last', 'high': 'max', 'low': 'min'})
+
 
                 macd1 = df1.ta.macd(fast=3, slow=10, signal=16)
                 macd2 = df2.ta.macd(fast=3, slow=10, signal=16)
@@ -190,9 +191,11 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
 
                 if not proceed:
                     return False
+                '''
+
                 df1['atr'] = ta.atr(df1['high'], df1['low'], df1['close'])
                 atrval = float(df1[-1:]['atr'])
-                obj1 = equity_buy_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price'])
+                obj1 = equity_buy_market(orderinfo['symbol'], orderinfo['qty'])
                 obj1.set_session(Session.NORMAL)
                 obj1.set_duration(Duration.DAY)
 
@@ -205,11 +208,10 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 obj2.set_stop_price_link_type(StopPriceLinkType.PERCENT)
 
 
-                obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'],orderinfo['price']+(atrval*4))
+                obj3 = equity_sell_limit(orderinfo['symbol'], orderinfo['qty'], orderinfo['price']+(atrval*4))
                 obj3.set_order_type(OrderType.LIMIT)
                 obj3.set_session(Session.NORMAL)
                 obj3.set_duration(Duration.GOOD_TILL_CANCEL)
-
 
                 x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
                 #x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1, obj2).build())
@@ -314,17 +316,17 @@ while True:
             time.sleep(1)
             pass
     # test if we are in regular market hours
-    #if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
-    if True:
+    if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart)) and datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
+    #if True:
         if up_text:
             if datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) >= (datetime.datetime.fromisoformat(marketstart) + datetime.timedelta(minutes=15)):
             #if True:
                 #uptext_handler
                 symbols = parse_alert(up_text)
-                if len(symbols) > 10:
-                    reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
-                else:
-                    reduced_symbols = symbols
+                #if len(symbols) > 10:
+                #    reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
+                #else:
+                reduced_symbols = symbols
                 print('received buy signal, pulling {}'.format(reduced_symbols))
                 positions = td_client_request('get_positions', c)
                 positiondict = {}
