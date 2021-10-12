@@ -62,10 +62,10 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            #if timediff.total_seconds() < 60:
-                            if True:
+                            if timediff.total_seconds() < 60:
+                            #if True:
                                 try:
-                                    soup = BeautifulSoup(response[1],'html.parser')
+                                    soup = BeautifulSoup(response[1], 'html.parser')
                                 except:
                                     print('i failed')
                                 try:
@@ -358,7 +358,6 @@ while True:
 
         #    pass
         else:
-            time.sleep(2)
             continue
     else:
         time.sleep(2)
