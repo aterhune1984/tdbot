@@ -21,6 +21,8 @@ import traceback
 import os
 import random
 import math
+import pandas_ta as ta
+import requests
 
 url = "https://api.tdameritrade.com/"
 scheduler = BackgroundScheduler()
@@ -60,7 +62,8 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            if timediff.total_seconds() < 300:
+                            #if timediff.total_seconds() < 60:
+                            if True:
                                 try:
                                     soup = BeautifulSoup(response[1],'html.parser')
                                 except:
@@ -104,7 +107,28 @@ def read_email_from_gmail():
         print(str(e))
 
 
+def consolidate(data, thirtymincount=2):
+    jsonobj=[]
+    num = -1
+    for i, e in enumerate(data):
+        num += 1
+        if num <= thirtymincount-1:
+            if num == 0:
+                open = e['open']
+                high = max([x['high'] for x in data][i:i+thirtymincount])
+                low = min([x['low'] for x in data][i:i+thirtymincount])
+                vol = sum([x['volume'] for x in data][i:i+thirtymincount])
+            if num == thirtymincount-1:
+                close = e['close']
+        if num == thirtymincount-1:
+            jsonobj.append({'open': open, 'high': high, 'low': low, "close": close, "volume": vol})
+            num = -1
+    return jsonobj
 
+
+def unix_convert(ts):
+    date = datetime.datetime.utcfromtimestamp(ts/1000)
+    return date
 
 @sleep_and_retry
 @limits(calls=120, period=60)
@@ -131,6 +155,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
             if option == 'place_order':
                 # we are going to try and place an order now.
                 #todo test test test
+
                 canbuy = False
                 data = c.get_price_history(ticker,
                                            frequency_type=Client.PriceHistory.FrequencyType.DAILY,
@@ -237,7 +262,7 @@ while True:
     backtest_dict = {}
     try:
         c = auth.client_from_token_file(token_path, api_key)
-    except FileNotFoundError:
+    except:
         from selenium import webdriver
 
         with webdriver.Firefox() as driver:
