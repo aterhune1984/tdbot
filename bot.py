@@ -62,7 +62,7 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            if timediff.total_seconds() < 60:
+                            if timediff.total_seconds() < 300:
                             #if True:
                                 try:
                                     soup = BeautifulSoup(response[1], 'html.parser')
@@ -178,6 +178,8 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     num_to_buy = int(max_cost_per_symbol // orderinfo['price'])  # number I can afford
                 if (num_to_buy*orderinfo['price']) < orderinfo['cash_available_for_trade']:
                     canbuy = True
+                else:
+                    print('cant afford it, need to pause and make sure we are doing this right.')
 
                 if canbuy:
                     obj1 = equity_buy_market(orderinfo['symbol'], num_to_buy)
@@ -185,10 +187,10 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                     obj1.set_duration(Duration.DAY)
 
                     obj2 = equity_sell_market(orderinfo['symbol'], num_to_buy)
-                    obj2.set_order_type(OrderType.TRAILING_STOP)
+                    obj2.set_order_type(OrderType.STOP)
                     obj2.set_session(Session.NORMAL)
                     obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price_offset(round(atrval*2, 2))  # offset in dollars
+                    obj2.set_stop_price(orderinfo['price'] - round(atrval*2, 2))  # offset in dollars
                     obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                     obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
 
@@ -325,20 +327,20 @@ while True:
                 prices = td_client_request('get_quotes', c, reduced_symbols)
                 # get list of symbols that I can afford
                 num_symbols = 3
-                if cash_available_for_trade > (cash_balance / num_symbols):
-                    affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
-                    affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
-                    if affordable_symbols:
-                        for symbol in affordable_symbols:
-                            #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
-                            #number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
-                            #print('buying {} of {}  at {}'.format(number_to_buy, symbol, prices[symbol]['lastPrice']))
-                            orderinfo = {'symbol': symbol,
-                                         'price': prices[symbol]['lastPrice'],
-                                         'cash_available_for_trade': cash_available_for_trade,
-                                         'cash_balance': cash_balance,
-                                         'num_symbols':num_symbols}
-                            td_client_request('place_order', c, ticker=symbol, orderinfo=orderinfo)
+                #if cash_available_for_trade > (cash_balance / num_symbols):
+                affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
+                affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
+                if affordable_symbols:
+                    for symbol in affordable_symbols:
+                        #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
+                        #number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
+                        #print('buying {} of {}  at {}'.format(number_to_buy, symbol, prices[symbol]['lastPrice']))
+                        orderinfo = {'symbol': symbol,
+                                     'price': prices[symbol]['lastPrice'],
+                                     'cash_available_for_trade': cash_available_for_trade,
+                                     'cash_balance': cash_balance,
+                                     'num_symbols':num_symbols}
+                        td_client_request('place_order', c, ticker=symbol, orderinfo=orderinfo)
 
                 pass
         #if down_text:
