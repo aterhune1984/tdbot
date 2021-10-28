@@ -46,6 +46,7 @@ def read_email_from_gmail():
         down_text = False
         up_text = False
         quit = False
+        high_volume = False
         if len(messages) > 0:  #  if there is mail in the mailbox...
             if messages[0] != b'':
                 for mail in messages:
@@ -62,8 +63,8 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            if timediff.total_seconds() < 300:
-                            #if True:
+                            #if timediff.total_seconds() < 300:
+                            if True:
                                 try:
                                     soup = BeautifulSoup(response[1], 'html.parser')
                                 except:
@@ -73,15 +74,17 @@ def read_email_from_gmail():
                                         quit=True
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
-                                    #elif 'tradingview_macd_long_sell' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
-                                    #    quit = True
-                                    #    down_text = soup.get_text().split('\nAlert')[1]
-                                    #    imap.store(mail, "+FLAGS", "\\Deleted")
-                                    #    break
+                                    elif 'high_volume_long' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
+                                        quit = True
+                                        up_text = soup.get_text().split('\nAlert')[1]
+                                        high_volume = True
+                                        imap.store(mail, "+FLAGS", "\\Deleted")
+                                        break
                                     #    # mark the mail as deleted
                                     elif 'stock_macd' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n', ''):
                                         quit = True
                                         up_text = soup.get_text().split('\nAlert')[1]
+                                        high_volume = False
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
                                     else:
@@ -99,7 +102,7 @@ def read_email_from_gmail():
             imap.expunge()
         imap.close()
         imap.logout()
-        return up_text, down_text
+        return up_text, down_text, high_volume
 
 
     except Exception as e:
@@ -142,7 +145,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                                            frequency_type=Client.PriceHistory.FrequencyType.DAILY,
                                            frequency=Client.PriceHistory.Frequency.DAILY,
                                            period_type=Client.PriceHistory.PeriodType.YEAR,
-                                           period=Client.PriceHistory.Period.ONE_YEAR,
+                                           period=Client.PriceHistory.Period.TWO_YEARS,
                                            need_extended_hours_data=False)
 
                 return_val = data.json()
@@ -157,57 +160,90 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 #todo test test test
 
                 canbuy = False
+
                 data = c.get_price_history(ticker,
                                            frequency_type=Client.PriceHistory.FrequencyType.DAILY,
                                            frequency=Client.PriceHistory.Frequency.DAILY,
                                            period_type=Client.PriceHistory.PeriodType.YEAR,
-                                           period=Client.PriceHistory.Period.ONE_YEAR,
+                                           period=Client.PriceHistory.Period.TWO_YEARS,
                                            need_extended_hours_data=False)
                 data_json = data.json()
                 df = ta.DataFrame(data_json['candles'], columns=['open', 'high', 'low', 'close', 'volume', 'datetime'])
-                df['atr'] = ta.atr(df['high'], df['low'], df['close'])
+                df['atr'] = ta.atr(df['high'], df['low'], df['close'], length=200)
                 atrval = float(df[-1:]['atr'])
 
                 max_to_risk = orderinfo['cash_balance'] * .02
-                shares_to_risk_max = int(max_to_risk/round(atrval*2, 2)//1)
+                if orderinfo['volume']:
+
+                    shares_to_risk_max = int(max_to_risk/round(atrval*2, 2)//1)
+                else:
+                    shares_to_risk_max = int(max_to_risk/round(atrval*2, 2)//1)
+
                 cost_to_buy_shares = orderinfo['price'] * shares_to_risk_max
                 max_cost_per_symbol = int((orderinfo['cash_balance'] / orderinfo['num_symbols']) // 1)
                 if cost_to_buy_shares < max_cost_per_symbol:
                     num_to_buy = shares_to_risk_max
                 else:
                     num_to_buy = int(max_cost_per_symbol // orderinfo['price'])  # number I can afford
-                if (num_to_buy*orderinfo['price']) < orderinfo['cash_available_for_trade']:
+                if (num_to_buy*orderinfo['price']) < orderinfo['cash_available_for_trade'] and num_to_buy != 0:
                     canbuy = True
                 else:
-                    print('cant afford it, need to pause and make sure we are doing this right.')
+                    pass
 
                 if canbuy:
-                    obj1 = equity_buy_market(orderinfo['symbol'], num_to_buy)
-                    obj1.set_session(Session.NORMAL)
-                    obj1.set_duration(Duration.DAY)
-
-                    obj2 = equity_sell_market(orderinfo['symbol'], num_to_buy)
-                    obj2.set_order_type(OrderType.STOP)
-                    obj2.set_session(Session.NORMAL)
-                    obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                    obj2.set_stop_price(orderinfo['price'] - round(atrval*2, 2))  # offset in dollars
-                    obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
-                    obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
+                    if num_to_buy > 0:
+                        orderinfo['volume'] = False
+                        if orderinfo['volume']:
 
 
-                    obj3 = equity_sell_limit(orderinfo['symbol'], num_to_buy, (orderinfo['price']+(atrval*6)))
-                    obj3.set_order_type(OrderType.LIMIT)
-                    obj3.set_session(Session.NORMAL)
-                    obj3.set_duration(Duration.GOOD_TILL_CANCEL)
+                            # todo not implimented yet as i'm not sure how to reserve 1 division of my balance to keep on hold for volume...
+
+                            obj1 = equity_buy_market(orderinfo['symbol'], num_to_buy)
+                            obj1.set_session(Session.NORMAL)
+                            obj1.set_duration(Duration.DAY)
+                            obj2 = equity_sell_market(orderinfo['symbol'], num_to_buy)
+                            obj2.set_order_type(OrderType.TRAILING_STOP)
+                            obj2.set_session(Session.NORMAL)
+                            obj2.set_duration(Duration.GOOD_TILL_CANCEL)
+                            obj2.set_stop_price_offset(round(atrval * 2, 1))  # offset in dollars
+                            obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
+                            obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
+                            x = c.place_order(TD_ACCOUNT,  first_triggers_second(obj1, obj2).build())
+                            if str(x.status_code).startswith('2'):
+                                print('placed both orders succesfully')
+                                return True
+                            else:
+                                num += 1
+                                print('something went wrong')
+                        if not orderinfo['volume']:
+                            obj1 = equity_buy_market(orderinfo['symbol'], num_to_buy)
+                            obj1.set_session(Session.NORMAL)
+                            obj1.set_duration(Duration.DAY)
+
+                            obj2 = equity_sell_market(orderinfo['symbol'], num_to_buy)
+                            obj2.set_order_type(OrderType.STOP)
+                            obj2.set_session(Session.NORMAL)
+                            obj2.set_duration(Duration.GOOD_TILL_CANCEL)
+                            obj2.set_stop_price(orderinfo['price'] - round(atrval*2, 2))  # offset in dollars
+                            obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
+                            obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
 
 
-                    x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
-                    if str(x.status_code).startswith('2'):
-                        print('placed both orders succesfully')
-                        return True
-                    else:
-                        num += 1
-                        print('something went wrong')
+                            obj3 = equity_sell_limit(orderinfo['symbol'], num_to_buy, (orderinfo['price']+(atrval*6)))
+                            obj3.set_order_type(OrderType.LIMIT)
+                            obj3.set_session(Session.NORMAL)
+                            obj3.set_duration(Duration.GOOD_TILL_CANCEL)
+
+
+                            x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
+                            if str(x.status_code).startswith('2'):
+                                print('placed both orders succesfully')
+                                return True
+                            else:
+                                num += 1
+                                print('something went wrong')
+                else:
+                    return False
 
             if option == 'get_positions':
                 return c.get_accounts(fields=Client.Account.Fields.POSITIONS).json()[0]
@@ -286,7 +322,7 @@ while True:
         cash_available_for_trade = 0.0
     while True:
         try:
-            up_text, down_text = read_email_from_gmail()
+            up_text, down_text, high_volume = read_email_from_gmail()
             break
         except:
             sys.stdout.write('x')
@@ -305,12 +341,41 @@ while True:
             pass
     # test if we are in regular market hours
     if (datetime.datetime.fromisoformat(marketstart)) <= datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
-    #if True:
-        if up_text:
+
+        num_symbols = 10
+        numforvolspike = cash_balance / (num_symbols + 1)
+
+        if high_volume:
+            print('drop everything and buy!!!!')
+            continue
+            symbols = parse_alert(up_text)
+            positions = td_client_request('get_positions', c)
+            positions = positions['securitiesAccount'].get('positions')
+            positiondict = {}
+            if positions:
+                for p in positions:
+                    if p['instrument']['assetType'] == 'EQUITY':
+                        positiondict[p['instrument']['symbol']] = p['longQuantity']
+            symbols_i_own = [x for x in symbols if x in positiondict.keys()]
+            reduced_symbols = [x for x in symbols if x not in symbols_i_own]
+            prices = td_client_request('get_quotes', c, reduced_symbols)
+            affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_available_for_trade]
+            affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
+            symbol_to_buy = random.choice(affordable_symbols)
+            orderinfo = {'symbol': symbol_to_buy,
+                         'price': prices[symbol_to_buy]['lastPrice'],
+                         'cash_available_for_trade': cash_available_for_trade,
+                         'cash_balance': cash_balance,
+                         'num_symbols': False,
+                         'volume': True,
+                         'numforvolspike': numforvolspike}
+            td_client_request('place_order', c, ticker=symbol_to_buy, orderinfo=orderinfo)
+
+        if up_text and not high_volume:
             #uptext_handler
             symbols = parse_alert(up_text)
             if len(symbols) > 10:
-                reduced_symbols = random.sample(symbols, 10)  # pick 5 stocks at random, too many will take too long
+                reduced_symbols = random.sample(symbols, 10)  # pick 10 stocks at random, too many will take too long
             else:
                 reduced_symbols = symbols
             print('received buy signal, pulling {}'.format(reduced_symbols))
@@ -326,12 +391,14 @@ while True:
             if reduced_symbols:
                 prices = td_client_request('get_quotes', c, reduced_symbols)
                 # get list of symbols that I can afford
-                num_symbols = 3
-                #if cash_available_for_trade > (cash_balance / num_symbols):
+
                 affordable_symbols = [x[0] for x in prices.items() if x[1]['lastPrice'] < cash_balance / num_symbols]
                 affordable_symbols = [x for x in affordable_symbols if x not in restricted_symbols]
                 if affordable_symbols:
                     for symbol in affordable_symbols:
+                        cash_available_for_trade = account_info['securitiesAccount']['projectedBalances'][
+                            'cashAvailableForTrading']
+
                         #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
                         #number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
                         #print('buying {} of {}  at {}'.format(number_to_buy, symbol, prices[symbol]['lastPrice']))
@@ -339,7 +406,9 @@ while True:
                                      'price': prices[symbol]['lastPrice'],
                                      'cash_available_for_trade': cash_available_for_trade,
                                      'cash_balance': cash_balance,
-                                     'num_symbols':num_symbols}
+                                     'num_symbols': num_symbols,
+                                     'volume': False,
+                                     'numforvolspike': numforvolspike}
                         td_client_request('place_order', c, ticker=symbol, orderinfo=orderinfo)
 
                 pass
