@@ -63,8 +63,8 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            #if timediff.total_seconds() < 300:
-                            if True:
+                            if timediff.total_seconds() < 300:
+                            #if True:
                                 try:
                                     soup = BeautifulSoup(response[1], 'html.parser')
                                 except:
@@ -342,7 +342,7 @@ while True:
     # test if we are in regular market hours
     if (datetime.datetime.fromisoformat(marketstart)) <= datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
 
-        num_symbols = 10
+        num_symbols = 15
         numforvolspike = cash_balance / (num_symbols + 1)
 
         if high_volume:
