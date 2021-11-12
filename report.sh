@@ -21,10 +21,15 @@ TRADES=0
 AVGDAYS=0
 
 for line in $(cat $filename); do
-    if  [[ $line =~ "to Open" ]]; then
-        OPEN=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
-    elif [[ $line =~ "to Close" ]]; then
-        CLOSE=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
+    if  [[ $line =~ "Buy to Open" ]]; then
+        LOPEN=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
+    elif [[ $line =~ "Sell to Close" ]]; then
+        LCLOSE=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
+    fi
+    if  [[ $line =~ "Sell to Open" ]]; then
+        SOPEN=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
+    elif [[ $line =~ "Buy to Close" ]]; then
+        SCLOSE=$(echo $line | awk -F";" '{print $6}' | awk -F"," '{print $1}')
     fi
     if [[ $line =~ "Max trade" ]]; then
         if [[ $LASTLINE =~ "to Open" ]]; then
@@ -32,14 +37,23 @@ for line in $(cat $filename); do
         fi
     fi
 
-    if test "$CLOSE"; then
-        echo -n "$OPEN - $CLOSE "
-        DAYS=$(echo $(ddiff -i '%m/%d/%y' $OPEN $CLOSE))
+    if test "$LCLOSE"; then
+        echo -n "$LOPEN - $LCLOSE "
+        DAYS=$(echo $(ddiff -i '%m/%d/%y' $LOPEN $LCLOSE))
         ((AVGDAYS+=DAYS))
         ((TRADES++))
         echo $DAYS
-        unset OPEN
-        unset CLOSE
+        unset LOPEN
+        unset LCLOSE
+    fi
+        if test "$SCLOSE"; then
+        echo -n "$SOPEN - $SCLOSE "
+        DAYS=$(echo $(ddiff -i '%m/%d/%y' $SOPEN $SCLOSE))
+        ((AVGDAYS+=DAYS))
+        ((TRADES++))
+        echo $DAYS
+        unset SOPEN
+        unset SCLOSE
     fi
 done
 echo "Number of trades: " $TRADES

@@ -137,7 +137,7 @@ def unix_convert(ts):
 @limits(calls=120, period=60)
 def td_client_request(option, c, ticker=False, orderinfo=False):
     num = 0
-    while num <= 3:
+    while num <= 1:
         time.sleep(1)
         try:
             if option == 'get_price_history':
@@ -311,7 +311,7 @@ while True:
             account_info = c.get_accounts().json()[0]
             break
         except Exception as e:
-            sys.stdout.write('x')
+            print('getting accounts ... x')
             time.sleep(1)
             pass
     try:
@@ -322,21 +322,21 @@ while True:
         cash_available_for_trade = 0.0
     while True:
         try:
+
             up_text, down_text, high_volume = read_email_from_gmail()
             break
-        except:
-            sys.stdout.write('x')
+        except Exception as e:
+            print('getting email ... x')
             time.sleep(1)
             pass
     while True:
         try:
-
             market_hours = c.get_hours_for_single_market(c.Markets.EQUITY, datetime.datetime.now())
             marketstart = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['start']
             marketend = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['end']
             break
-        except:
-            sys.stdout.write('x')
+        except Exception as e:
+            print('getting market hours ... x')
             time.sleep(1)
             pass
     # test if we are in regular market hours
@@ -372,13 +372,14 @@ while True:
             td_client_request('place_order', c, ticker=symbol_to_buy, orderinfo=orderinfo)
 
         if up_text and not high_volume:
-            #uptext_handler
             symbols = parse_alert(up_text)
+            print('received buy signal, pulling {}'.format(symbols))
+            #uptext_handler
             if len(symbols) > 10:
                 reduced_symbols = random.sample(symbols, 10)  # pick 10 stocks at random, too many will take too long
             else:
                 reduced_symbols = symbols
-            print('received buy signal, pulling {}'.format(reduced_symbols))
+
             positions = td_client_request('get_positions', c)
             positions = positions['securitiesAccount'].get('positions')
             positiondict = {}
