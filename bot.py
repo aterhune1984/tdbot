@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from keys import ameritrade, gmailpass
+from keys import ameritrade, GMAILPASS
 
 from ratelimit import limits, sleep_and_retry
 import sys
@@ -29,10 +29,11 @@ scheduler = BackgroundScheduler()
 
 ORG_EMAIL = "@gmail.com"
 FROM_EMAIL = "terhunetdbot" + ORG_EMAIL
-FROM_PWD = gmailpass
+FROM_PWD = GMAILPASS
 SMTP_SERVER = "imap.gmail.com"
 SMTP_PORT = 993
 TD_ACCOUNT = '238433715'
+
 
 def read_email_from_gmail():
     try:
@@ -63,8 +64,8 @@ def read_email_from_gmail():
                             timediff = datetime.datetime.now(tz=pacific) - datetime.datetime.strptime(
                                 str(response[1]).split('Received:')[1].split('\\r\\n')[1].strip().split(' (')[0],
                                 '%a, %d %b %Y %H:%M:%S %z')
-                            if timediff.total_seconds() < 300:
-                            #if True:
+                            #if timediff.total_seconds() < 300:
+                            if True:
                                 try:
                                     soup = BeautifulSoup(response[1], 'html.parser')
                                 except:
@@ -74,19 +75,12 @@ def read_email_from_gmail():
                                         quit=True
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
-                                    elif 'high_volume_long' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
+                                    elif 'ichimoku_filter' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
                                         quit = True
                                         up_text = soup.get_text().split('\nAlert')[1]
-                                        high_volume = True
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
                                     #    # mark the mail as deleted
-                                    elif 'stock_macd' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n', ''):
-                                        quit = True
-                                        up_text = soup.get_text().split('\nAlert')[1]
-                                        high_volume = False
-                                        imap.store(mail, "+FLAGS", "\\Deleted")
-                                        break
                                     else:
                                         quit = True
                                         imap.store(mail, "+FLAGS", "\\Deleted")
@@ -297,13 +291,14 @@ restricted_symbols = ['RXT']
 print('Starting TDBOT...')
 
 while True:
+    time.sleep(60)
     backtest_dict = {}
     try:
         c = auth.client_from_token_file(token_path, api_key)
     except:
         from selenium import webdriver
 
-        with webdriver.Firefox() as driver:
+        with webdriver.Chrome() as driver:
             c = auth.client_from_login_flow(
                 driver, api_key, redirect_uri, token_path)
     while True:
@@ -399,18 +394,18 @@ while True:
                     for symbol in affordable_symbols:
                         cash_available_for_trade = account_info['securitiesAccount']['projectedBalances'][
                             'cashAvailableForTrading']
-
-                        #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
-                        #number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
-                        #print('buying {} of {}  at {}'.format(number_to_buy, symbol, prices[symbol]['lastPrice']))
-                        orderinfo = {'symbol': symbol,
-                                     'price': prices[symbol]['lastPrice'],
-                                     'cash_available_for_trade': cash_available_for_trade,
-                                     'cash_balance': cash_balance,
-                                     'num_symbols': num_symbols,
-                                     'volume': False,
-                                     'numforvolspike': numforvolspike}
-                        td_client_request('place_order', c, ticker=symbol, orderinfo=orderinfo)
+                        if cash_available_for_trade > prices[symbol]['lastPrice']:
+                            #symbol_to_invest = random.choice(affordable_symbols)   # its a crapshoot so lets just choose a random one.
+                            #number_to_buy = math.floor((cash_balance / num_symbols) / prices[symbol]['lastPrice'])
+                            #print('buying {} of {}  at {}'.format(number_to_buy, symbol, prices[symbol]['lastPrice']))
+                            orderinfo = {'symbol': symbol,
+                                         'price': prices[symbol]['lastPrice'],
+                                         'cash_available_for_trade': cash_available_for_trade,
+                                         'cash_balance': cash_balance,
+                                         'num_symbols': num_symbols,
+                                         'volume': False,
+                                         'numforvolspike': numforvolspike}
+                            td_client_request('place_order', c, ticker=symbol, orderinfo=orderinfo)
 
                 pass
         #if down_text:
