@@ -69,7 +69,7 @@ def read_email_from_gmail():
                                 try:
                                     soup = BeautifulSoup(response[1], 'html.parser')
                                 except:
-                                    print('i failed')
+                                    print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'i failed')
                                 try:
                                     if 'AA_aterhune1984' in soup.get_text() or ' SOLD ' in soup.get_text():
                                         quit=True
@@ -78,6 +78,7 @@ def read_email_from_gmail():
                                     elif 'ichimoku_filter' in ','.join(soup.get_text().split('\nAlert')).replace('=\r\n',''):
                                         quit = True
                                         up_text = soup.get_text().split('\nAlert')[1]
+                                        print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), "Received email...")
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
                                     #    # mark the mail as deleted
@@ -86,10 +87,8 @@ def read_email_from_gmail():
                                         imap.store(mail, "+FLAGS", "\\Deleted")
                                         break
                                 except Exception as e:
-                                    print(e)
-                            else:
-                                print('deleting invalid email')
-                                imap.store(mail, "+FLAGS", "\\Deleted")
+                                    print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), e)
+
                     if quit:
                         break
 
@@ -101,7 +100,7 @@ def read_email_from_gmail():
 
     except Exception as e:
         traceback.print_exc()
-        print(str(e))
+        print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), str(e))
 
 
 def consolidate(data, thirtymincount=2):
@@ -204,11 +203,11 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                             obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
                             x = c.place_order(TD_ACCOUNT,  first_triggers_second(obj1, obj2).build())
                             if str(x.status_code).startswith('2'):
-                                print('placed both orders succesfully')
+                                print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'placed both orders succesfully for {} of {}'.format(num_to_buy, orderinfo['symbol']))
                                 return True
                             else:
                                 num += 1
-                                print('something went wrong')
+                                print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'something went wrong')
                         if not orderinfo['volume']:
                             obj1 = equity_buy_market(orderinfo['symbol'], num_to_buy)
                             obj1.set_session(Session.NORMAL)
@@ -231,11 +230,11 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
 
                             x = c.place_order(TD_ACCOUNT, first_triggers_second(obj1,  one_cancels_other(obj2, obj3)).build())
                             if str(x.status_code).startswith('2'):
-                                print('placed both orders succesfully')
+                                print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'placed both orders succesfully for {} of {}'.format(num_to_buy, orderinfo['symbol']))
                                 return True
                             else:
                                 num += 1
-                                print('something went wrong')
+                                print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'something went wrong')
                 else:
                     return False
 
@@ -249,7 +248,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                         for i, cos in enumerate(y['childOrderStrategies']):
                             x = c.cancel_order(cos['childOrderStrategies'][i]['orderId'], TD_ACCOUNT)
                             if str(x.status_code).startswith('2'):
-                                print('canceled trailing stop order successfully')
+                                print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'canceled trailing stop order successfully')
 
                                 obj = equity_sell_market(orderinfo['symbol'], orderinfo['qty'])
                                 obj.set_session(Session.NORMAL)
@@ -257,11 +256,11 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                                 order = obj.build()
                                 x = c.place_order(TD_ACCOUNT, order)
                                 if str(x.status_code).startswith('2'):
-                                    print('placed sell order successfully')
+                                    print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'placed sell order successfully')
                                     return True
                                 else:
                                     num += 1
-                                    print('something went wrong')
+                                    print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'something went wrong')
         except Exception as e:
             num += 1
             time.sleep(1)
@@ -276,7 +275,7 @@ def parse_alert(text):
         try:
             symbols = [text.split('=\r\n ')[1].split(' was added')[0]]
         except Exception as e:
-            print(e)
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), e)
     return symbols
 
 
@@ -288,10 +287,9 @@ token_path = '{}/token.pickle'.format(os.getcwd())
 api_key = '{}@AMER.OAUTHAP'.format(ameritrade)
 redirect_uri = 'http://localhost:8000'
 restricted_symbols = ['RXT']
-print('Starting TDBOT...')
+print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'Starting TDBOT...')
 
 while True:
-    time.sleep(300)
     backtest_dict = {}
     try:
         c = auth.client_from_token_file(token_path, api_key)
@@ -306,7 +304,7 @@ while True:
             account_info = c.get_accounts().json()[0]
             break
         except Exception as e:
-            print('getting accounts ... x')
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'getting accounts ... x')
             time.sleep(60)
             pass
     try:
@@ -321,7 +319,7 @@ while True:
             up_text, down_text, high_volume = read_email_from_gmail()
             break
         except Exception as e:
-            print('getting email ... x')
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'getting email ... x')
             time.sleep(60)
             pass
     while True:
@@ -331,7 +329,7 @@ while True:
             marketend = market_hours.json()['equity']['EQ']['sessionHours']['regularMarket'][0]['end']
             break
         except Exception as e:
-            print('getting market hours ... x')
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'getting market hours ... x')
             time.sleep(60)
             pass
     # test if we are in regular market hours
@@ -341,7 +339,7 @@ while True:
         numforvolspike = cash_balance / (num_symbols + 1)
 
         if high_volume:
-            print('drop everything and buy!!!!')
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'drop everything and buy!!!!')
             continue
             symbols = parse_alert(up_text)
             positions = td_client_request('get_positions', c)
@@ -368,7 +366,7 @@ while True:
 
         if up_text and not high_volume:
             symbols = parse_alert(up_text)
-            print('received buy signal, pulling {}'.format(symbols))
+            print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'received buy signal, pulling {}'.format(symbols))
             #uptext_handler
             if len(symbols) > 10:
                 reduced_symbols = random.sample(symbols, 10)  # pick 10 stocks at random, too many will take too long
@@ -429,3 +427,5 @@ while True:
     else:
         time.sleep(300)
         continue
+    time.sleep(300)
+
