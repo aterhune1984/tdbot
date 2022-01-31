@@ -335,7 +335,7 @@ while True:
     # test if we are in regular market hours
     if (datetime.datetime.fromisoformat(marketstart)) <= datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
 
-        num_symbols = 15
+        num_symbols = 30
         numforvolspike = cash_balance / (num_symbols + 1)
 
         if high_volume:
