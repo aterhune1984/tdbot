@@ -291,7 +291,7 @@ restricted_symbols = ['RXT']
 print('Starting TDBOT...')
 
 while True:
-    time.sleep(60)
+    time.sleep(300)
     backtest_dict = {}
     try:
         c = auth.client_from_token_file(token_path, api_key)
@@ -307,7 +307,7 @@ while True:
             break
         except Exception as e:
             print('getting accounts ... x')
-            time.sleep(1)
+            time.sleep(60)
             pass
     try:
         cash_balance = account_info['securitiesAccount']['currentBalances']['liquidationValue']
@@ -322,7 +322,7 @@ while True:
             break
         except Exception as e:
             print('getting email ... x')
-            time.sleep(1)
+            time.sleep(60)
             pass
     while True:
         try:
@@ -332,7 +332,7 @@ while True:
             break
         except Exception as e:
             print('getting market hours ... x')
-            time.sleep(1)
+            time.sleep(60)
             pass
     # test if we are in regular market hours
     if (datetime.datetime.fromisoformat(marketstart)) <= datetime.datetime.now(datetime.datetime.fromisoformat(marketstart).tzinfo) <= datetime.datetime.fromisoformat(marketend):
@@ -427,5 +427,5 @@ while True:
         else:
             continue
     else:
-        time.sleep(2)
+        time.sleep(300)
         continue
