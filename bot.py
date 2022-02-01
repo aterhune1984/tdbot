@@ -263,7 +263,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                                     print(datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p"), 'something went wrong')
         except Exception as e:
             num += 1
-            time.sleep(1)
+            time.sleep(60)
     return False
 
 
@@ -423,7 +423,9 @@ while True:
 
         #    pass
         else:
+            time.sleep(300)
             continue
+
     else:
         time.sleep(300)
         continue
