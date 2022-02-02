@@ -168,9 +168,9 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                 max_to_risk = orderinfo['cash_balance'] * .02
                 if orderinfo['volume']:
 
-                    shares_to_risk_max = int(max_to_risk/round(atrval*2, 2)//1)
+                    shares_to_risk_max = int(max_to_risk/round(atrval*3, 2)//1)
                 else:
-                    shares_to_risk_max = int(max_to_risk/round(atrval*2, 2)//1)
+                    shares_to_risk_max = int(max_to_risk/round(atrval*3, 2)//1)
 
                 cost_to_buy_shares = orderinfo['price'] * shares_to_risk_max
                 max_cost_per_symbol = int((orderinfo['cash_balance'] / orderinfo['num_symbols']) // 1)
@@ -198,7 +198,7 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                             obj2.set_order_type(OrderType.TRAILING_STOP)
                             obj2.set_session(Session.NORMAL)
                             obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                            obj2.set_stop_price_offset(round(atrval * 2, 1))  # offset in dollars
+                            obj2.set_stop_price_offset(round(atrval * 3, 2))  # offset in dollars
                             obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                             obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
                             x = c.place_order(TD_ACCOUNT,  first_triggers_second(obj1, obj2).build())
@@ -217,12 +217,12 @@ def td_client_request(option, c, ticker=False, orderinfo=False):
                             obj2.set_order_type(OrderType.STOP)
                             obj2.set_session(Session.NORMAL)
                             obj2.set_duration(Duration.GOOD_TILL_CANCEL)
-                            obj2.set_stop_price(orderinfo['price'] - round(atrval*2, 2))  # offset in dollars
+                            obj2.set_stop_price(orderinfo['price'] - round(atrval*3, 2))  # offset in dollars
                             obj2.set_stop_price_link_basis(StopPriceLinkBasis.LAST)
                             obj2.set_stop_price_link_type(StopPriceLinkType.VALUE)
 
 
-                            obj3 = equity_sell_limit(orderinfo['symbol'], num_to_buy, (orderinfo['price']+(atrval*6)))
+                            obj3 = equity_sell_limit(orderinfo['symbol'], num_to_buy, (orderinfo['price']+(round(atrval*9, 2))))
                             obj3.set_order_type(OrderType.LIMIT)
                             obj3.set_session(Session.NORMAL)
                             obj3.set_duration(Duration.GOOD_TILL_CANCEL)
